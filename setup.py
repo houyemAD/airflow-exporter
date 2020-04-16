@@ -9,7 +9,7 @@ with open(readme_file) as f:
     readme = f.read()
 
 setup(
-    name="airflow-exporter",
+    name="airflow-exporter-test",
     use_scm_version=True,
     description="Airflow plugin to export dag and task based metrics to Prometheus.",
     long_description=readme,
