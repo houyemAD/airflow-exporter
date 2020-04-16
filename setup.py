@@ -25,7 +25,7 @@ setup(
         "Topic :: System :: Monitoring",
     ],
     keywords="airflow plugin prometheus exporter metrics",
-    url="https://github.com/epoch8/airflow-exporter",
+    url="https://github.com/houyemAD/airflow-exporter",
     packages=["airflow_exporter"],
     setup_requires=['setuptools_scm'],
     install_requires=[
