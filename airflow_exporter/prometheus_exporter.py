@@ -109,7 +109,6 @@ class MetricsCollector(object):
 
             t_state = GaugeMetricFamily(
                 'airflow_task_status',
-                'Shows the number of task starts with this status',
                 labels=['dag_id', 'task_id', 'owner', 'status'] + k
             )
             for task in tasks:
@@ -124,7 +123,6 @@ class MetricsCollector(object):
 
             d_state = GaugeMetricFamily(
                 'airflow_dag_status',
-                'Shows the number of dag starts with this status',
                 labels=['dag_id', 'owner', 'status'] + k
             )
             d_state.add_metric([dag.dag_id, dag.owners, dag.state] + v, dag.count)
@@ -137,7 +135,6 @@ class MetricsCollector(object):
 
             dag_duration = GaugeMetricFamily(
                 'airflow_dag_run_duration',
-                'Maximum duration of currently running dag_runs for each DAG in seconds',
                 labels=['dag_id'] + k
             )
             if driver == 'mysqldb' or driver == 'pysqlite':
