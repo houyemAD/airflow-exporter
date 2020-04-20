@@ -39,7 +39,7 @@ def get_task_state_info():
     '''
     task_status_query = Session.query(
         TaskInstance.dag_id, TaskInstance.task_id,
-        TaskInstance.state, func.count(TaskInstance.dag_id).label('value')
+        TaskInstance.state,  func.count(TaskInstance.dag_id).label('value')
     ).group_by(TaskInstance.dag_id, TaskInstance.task_id, TaskInstance.state).subquery()
 
     return Session.query(
@@ -70,10 +70,11 @@ def get_dag_duration_info():
         DagRun.state == State.RUNNING
     ).all()
 
-def get_task_duration_info():
-    """Duration of successful tasks in seconds."""
-    
-    max_execution_dt_query = Session.query(
+    def get_task_duration_info():
+    ''' get duration of successful tasks in seconds
+    '''
+        max_execution_dt_query = 
+            Session.query(
                 DagRun.dag_id,
                 func.max(DagRun.execution_date).label("max_execution_dt"),
             )
@@ -88,12 +89,13 @@ def get_task_duration_info():
             .subquery()
         
 
-        return session.query(
-            TaskInstance.dag_id,
-            TaskInstance.task_id,
-            TaskInstance.start_date,
-            TaskInstance.end_date,
-            TaskInstance.execution_date,
+        return (
+            Session.query(
+                TaskInstance.dag_id,
+                TaskInstance.task_id,
+                TaskInstance.start_date,
+                TaskInstance.end_date,
+                TaskInstance.execution_date,
             )
             .join(
                 max_execution_dt_query,
@@ -111,6 +113,7 @@ def get_task_duration_info():
                 TaskInstance.end_date.isnot(None),
             )
             .all()
+        )
 
 
 def get_dag_labels(dag_id):
@@ -172,7 +175,7 @@ class MetricsCollector(object):
                 [task.task_id, task.dag_id, str(task.execution_date.date())],
                 task_duration_value,
             )
-        yield task_duration
+        yield task_duration            
 
         # Dag Metrics
         dag_info = get_dag_state_info()
