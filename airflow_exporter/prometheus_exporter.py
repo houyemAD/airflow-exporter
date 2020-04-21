@@ -18,7 +18,14 @@ from contextlib import contextmanager
 
 import itertools
 
-
+@contextmanager
+def session_scope(session):
+    """Provide a transactional scope around a series of operations."""
+    try:
+        yield session
+    finally:
+        session.close()
+        
 def get_dag_state_info():
     '''get dag info
     :return dag_info
