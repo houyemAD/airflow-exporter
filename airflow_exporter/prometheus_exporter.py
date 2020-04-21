@@ -39,7 +39,7 @@ def get_task_state_info():
     '''
     task_status_query = Session.query(
         TaskInstance.dag_id, TaskInstance.task_id,
-        TaskInstance.state,  func.count(TaskInstance.dag_id).label('value')
+        TaskInstance.state, func.count(TaskInstance.dag_id).label('value')
     ).group_by(TaskInstance.dag_id, TaskInstance.task_id, TaskInstance.state).subquery()
 
     return Session.query(
@@ -69,51 +69,6 @@ def get_dag_duration_info():
     ).filter(
         DagRun.state == State.RUNNING
     ).all()
-
-    def get_task_duration_info():
-    ''' get duration of successful tasks in seconds
-    '''
-        max_execution_dt_query = 
-            Session.query(
-                DagRun.dag_id,
-                func.max(DagRun.execution_date).label("max_execution_dt"),
-            )
-            .join(DagModel, DagModel.dag_id == DagRun.dag_id,)
-            .filter(
-                DagModel.is_active == True,  # noqa
-                DagModel.is_paused == False,
-                DagRun.state == State.SUCCESS,
-                DagRun.end_date.isnot(None),
-            )
-            .group_by(DagRun.dag_id)
-            .subquery()
-        
-
-        return (
-            Session.query(
-                TaskInstance.dag_id,
-                TaskInstance.task_id,
-                TaskInstance.start_date,
-                TaskInstance.end_date,
-                TaskInstance.execution_date,
-            )
-            .join(
-                max_execution_dt_query,
-                and_(
-                    (TaskInstance.dag_id == max_execution_dt_query.c.dag_id),
-                    (
-                        TaskInstance.execution_date
-                        == max_execution_dt_query.c.max_execution_dt
-                    ),
-                ),
-            )
-            .filter(
-                TaskInstance.state == State.SUCCESS,
-                TaskInstance.start_date.isnot(None),
-                TaskInstance.end_date.isnot(None),
-            )
-            .all()
-        )
 
 
 def get_dag_labels(dag_id):
@@ -161,21 +116,6 @@ class MetricsCollector(object):
                 t_state.add_metric([task.dag_id, task.task_id, task.owners, task.state or 'none'] + v, task.value)
             
             yield t_state
-
-        task_duration = GaugeMetricFamily(
-            "airflow_task_duration",
-            "Duration of successful tasks in seconds",
-            labels=["task_id", "dag_id", "execution_date"],
-        )
-        for task in get_task_duration_info():
-            task_duration_value = (
-                task.end_date - task.start_date
-            ).total_seconds()
-            task_duration.add_metric(
-                [task.task_id, task.dag_id, str(task.execution_date.date())],
-                task_duration_value,
-            )
-        yield task_duration            
 
         # Dag Metrics
         dag_info = get_dag_state_info()
