@@ -1,5 +1,6 @@
 from sqlalchemy import func
 from sqlalchemy import text
+from sqlalchemy import and_
 
 from flask import Response
 from flask_admin import BaseView, expose
@@ -25,7 +26,7 @@ def session_scope(session):
         yield session
     finally:
         session.close()
-        
+
 def get_dag_state_info():
     '''get dag info
     :return dag_info
