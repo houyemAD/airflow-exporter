@@ -208,9 +208,9 @@ def get_dag_labels(dag_id):
 # Scheduler Related Metrics
 ######################
 
-
+"""
 def get_dag_scheduler_delay():
-    """Compute DAG scheduling delay."""
+    ""Compute DAG scheduling delay.""
     with session_scope(Session) as session:
         return (
             session.query(
@@ -219,7 +219,7 @@ def get_dag_scheduler_delay():
             .limit(20)
             .all()
         )
-
+"""
 
 
 
@@ -305,7 +305,7 @@ class MetricsCollector(object):
             successful_dag_duration.add_metric([dag.dag_id], successful_dag_duration_value)
         yield dag_duration
 
-        # Scheduler Metrics
+"""        # Scheduler Metrics
         dag_scheduler_delay = GaugeMetricFamily(
             "airflow_dag_scheduler_delay",
             "Airflow DAG scheduling delay",
@@ -321,7 +321,7 @@ class MetricsCollector(object):
         yield dag_scheduler_delay
 
 
-
+"""
 REGISTRY.register(MetricsCollector())
 
 if settings.RBAC:
