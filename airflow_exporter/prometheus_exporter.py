@@ -208,18 +208,37 @@ def get_dag_labels(dag_id):
 # Scheduler Related Metrics
 ######################
 
-"""
-def get_dag_scheduler_delay():
-    ""Compute DAG scheduling delay.""
+
+def get_dag_schedule_delays():
+    """Schedule delay for dags in seconds"""
+
+    now = dt.datetime.now().replace(tzinfo=pytz.UTC)
+    week_ago = now - dt.timedelta(weeks=1)
+
     with session_scope(Session) as session:
+        max_id_query = (
+            session.query(func.max(DagRun.id))
+            .filter(DagRun.execution_date.between(week_ago, now))
+            .group_by(DagRun.dag_id)
+            .subquery()
+        )
+
         return (
             session.query(
-                DagRun.dag_id, DagRun.execution_date, DagRun.start_date,
+                DagModel.dag_id,
+                DagModel.schedule_interval,
+                DagRun.execution_date,
+                DagRun.start_date,
             )
-            .limit(20)
+            .join(DagModel, DagModel.dag_id == DagRun.dag_id)
+            .filter(
+                DagModel.is_active == True,
+                DagModel.is_paused == False,
+                DagModel.schedule_interval.isnot(None),
+                DagRun.id.in_(max_id_query),
+            )
             .all()
         )
-"""
 
 
 
@@ -303,25 +322,40 @@ class MetricsCollector(object):
                 dag.end_date - dag.start_date
             ).total_seconds()
             successful_dag_duration.add_metric([dag.dag_id], successful_dag_duration_value)
-        yield dag_duration
+        yield successful_dag_duration
 
-"""        # Scheduler Metrics
+
+         # Scheduler Metrics
         dag_scheduler_delay = GaugeMetricFamily(
             "airflow_dag_scheduler_delay",
             "Airflow DAG scheduling delay",
-            labels=["dag_id","execution_date","start_date"],
+            labels=["dag_id","execution_date","start_date","interval_bucket"],
         )
-        for dag in get_dag_scheduler_delay():
-            dag_scheduling_delay_value = (
-                dag.start_date - dag.execution_date
-            ).total_seconds()
-            dag_scheduler_delay.add_metric(
-                [dag.dag_id,dag.execution_date,dag.start_date], dag_scheduling_delay_value
-            )
-        yield dag_scheduler_delay
+        for dag in get_dag_schedule_delays():
+            if dag.schedule_interval is not None:
+                c = croniter(dag.schedule_interval, dag.execution_date)
+                planned_start_date = c.get_next(dt.datetime)
+
+                interval = (
+                    planned_start_date - dag.execution_date
+                ).total_seconds() / 3600.0
+                if interval <= 1:
+                    interval_bucket = "<1h"
+                elif interval > 1 and interval <= 6:
+                    interval_bucket = "1-6h"
+                else:
+                    interval_bucket = ">6h"
+
+                dag_schedule_delay = (
+                    dag.start_date - planned_start_date
+                ).total_seconds()
+                airflow_dag_schedule_delay.add_metric(
+                    [dag.dag_id, dag.execution_date, dag.start_date, interval_bucket], dag_schedule_delay
+                )
+        yield airflow_dag_schedule_delay
 
 
-"""
+
 REGISTRY.register(MetricsCollector())
 
 if settings.RBAC:
