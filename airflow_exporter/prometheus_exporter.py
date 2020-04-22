@@ -55,6 +55,68 @@ def get_task_state_info():
         task_status_query.c.state, task_status_query.c.value, DagModel.owners
     ).join(DagModel, DagModel.dag_id == task_status_query.c.dag_id).order_by(task_status_query.c.dag_id).all()
 
+def get_successful_dag_duration_info():
+    """Duration of successful DAG Runs."""
+    with session_scope(Session) as session:
+        max_execution_dt_query = (
+            session.query(
+                DagRun.dag_id,
+                func.max(DagRun.execution_date).label("max_execution_dt"),
+            )
+            .join(DagModel, DagModel.dag_id == DagRun.dag_id)
+            .filter(
+                DagModel.is_active == True,  # noqa
+                DagModel.is_paused == False,
+                DagRun.state == State.SUCCESS,
+                DagRun.end_date.isnot(None),
+                text("execution_date > NOW() - interval \'14 days\'"),
+            )
+            .group_by(DagRun.dag_id)
+            .subquery()
+        )
+
+        dag_start_dt_query = (
+            session.query(
+                max_execution_dt_query.c.dag_id,
+                max_execution_dt_query.c.max_execution_dt.label(
+                    "execution_date"
+                ),
+                func.min(TaskInstance.start_date).label("start_date"),
+            )
+            .join(
+                TaskInstance,
+                and_(
+                    TaskInstance.dag_id == max_execution_dt_query.c.dag_id,
+                    (
+                        TaskInstance.execution_date
+                        == max_execution_dt_query.c.max_execution_dt
+                    ),
+                ),
+            )
+            .group_by(
+                max_execution_dt_query.c.dag_id,
+                max_execution_dt_query.c.max_execution_dt,
+            )
+            .subquery()
+        )
+
+        return (
+            session.query(
+                dag_start_dt_query.c.dag_id,
+                dag_start_dt_query.c.start_date,
+                DagRun.end_date,
+            )
+            .join(
+                DagRun,
+                and_(
+                    DagRun.dag_id == dag_start_dt_query.c.dag_id,
+                    DagRun.execution_date
+                    == dag_start_dt_query.c.execution_date,
+                ),
+            )
+            .all()
+        )
+
 
 def get_dag_duration_info():
     '''get duration of currently running DagRuns
@@ -142,6 +204,24 @@ def get_dag_labels(dag_id):
     
     return list(labels.keys()), list(labels.values())
 
+######################
+# Scheduler Related Metrics
+######################
+
+
+def get_dag_scheduler_delay():
+    """Compute DAG scheduling delay."""
+    with session_scope(Session) as session:
+        return (
+            session.query(
+                DagRun.dag_id, DagRun.execution_date, DagRun.start_date,
+            )
+            .limit(20)
+            .all()
+        )
+
+
+
 
 class MetricsCollector(object):
     '''collection of metrics for prometheus'''
@@ -212,6 +292,34 @@ class MetricsCollector(object):
             else:
                 dag_duration.add_metric([dag.dag_id] + v, dag.duration.seconds)
             yield dag_duration
+
+        successful_dag_duration = GaugeMetricFamily(
+            "airflow_successful_dag_run_duration",
+            "Duration of successful dag_runs in seconds",
+            labels=["dag_id"],
+        )
+        for dag in get_successful_dag_duration_info():
+            successful_dag_duration_value = (
+                dag.end_date - dag.start_date
+            ).total_seconds()
+            successful_dag_duration.add_metric([dag.dag_id], successful_dag_duration_value)
+        yield dag_duration
+
+        # Scheduler Metrics
+        dag_scheduler_delay = GaugeMetricFamily(
+            "airflow_dag_scheduler_delay",
+            "Airflow DAG scheduling delay",
+            labels=["dag_id","execution_date","start_date"],
+        )
+        for dag in get_dag_scheduler_delay():
+            dag_scheduling_delay_value = (
+                dag.start_date - dag.execution_date
+            ).total_seconds()
+            dag_scheduler_delay.add_metric(
+                [dag.dag_id,dag.execution_date,dag.start_date], dag_scheduling_delay_value
+            )
+        yield dag_scheduler_delay
+
 
 
 REGISTRY.register(MetricsCollector())
