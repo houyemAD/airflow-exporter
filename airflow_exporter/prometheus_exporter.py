@@ -98,7 +98,7 @@ def get_task_duration_info():
         )
 
         return (
-            Session.query(
+            session.query(
                 TaskInstance.dag_id,
                 TaskInstance.task_id,
                 TaskInstance.start_date,
@@ -122,6 +122,7 @@ def get_task_duration_info():
             )
             .all()
         )
+
 
 def get_dag_labels(dag_id):
     # reuse airflow webserver dagbag
