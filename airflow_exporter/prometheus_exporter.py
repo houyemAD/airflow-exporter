@@ -98,7 +98,7 @@ def get_task_duration_info():
         )
 
         return (
-            session.query(
+            Session.query(
                 TaskInstance.dag_id,
                 TaskInstance.task_id,
                 TaskInstance.start_date,
