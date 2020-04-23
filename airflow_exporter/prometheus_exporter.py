@@ -158,6 +158,7 @@ def get_dag_scheduler_delay():
             session.query(
                 DagRun.dag_id, DagRun.execution_date, DagRun.start_date,
             )
+            .order_by(DagRun.execution_date.desc())
             .limit(20)
             .all()
         )
@@ -246,7 +247,7 @@ class MetricsCollector(object):
                 dag.start_date - dag.execution_date
             ).total_seconds()
             dag_scheduler_delay.add_metric(
-                [dag.dag_id,dag.start_date,dag.execution_date], dag_scheduling_delay_value
+                [dag.dag_id,dag.start_date.strftime("%d-%b-%Y (%H:%M:%S.%f)"),dag.execution_date.strftime("%d-%b-%Y (%H:%M:%S.%f)")], dag_scheduling_delay_value
             )
         yield dag_scheduler_delay
 
