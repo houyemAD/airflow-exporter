@@ -19,6 +19,13 @@ from contextlib import contextmanager
 
 import itertools
 
+import pytz
+import datetime as dt
+from croniter import croniter
+
+
+
+
 @contextmanager
 def session_scope(session):
     """Provide a transactional scope around a series of operations."""
@@ -144,6 +151,38 @@ def get_dag_labels(dag_id):
     return list(labels.keys()), list(labels.values())
 
 
+def get_dag_schedule_delays():
+    """Schedule delay for dags in seconds"""
+
+    now = dt.datetime.now().replace(tzinfo=pytz.UTC)
+    week_ago = now - dt.timedelta(weeks=1)
+
+    with session_scope(Session) as session:
+        max_id_query = (
+            session.query(func.max(DagRun.id))
+            .filter(DagRun.execution_date.between(week_ago, now))
+            .group_by(DagRun.dag_id)
+            .subquery()
+        )
+
+        return (
+            session.query(
+                DagModel.dag_id,
+                DagModel.schedule_interval,
+                DagRun.execution_date,
+                DagRun.start_date,
+            )
+            .join(DagModel, DagModel.dag_id == DagRun.dag_id)
+            .filter(
+                DagModel.is_active == True,
+                DagModel.is_paused == False,
+                DagModel.schedule_interval.isnot(None),
+                DagRun.id.in_(max_id_query),
+            )
+            .all()
+        )
+
+
 class MetricsCollector(object):
     '''collection of metrics for prometheus'''
 
@@ -213,6 +252,36 @@ class MetricsCollector(object):
             else:
                 dag_duration.add_metric([dag.dag_id] + v, dag.duration.seconds)
             yield dag_duration
+
+        #schedule delay
+        airflow_dag_schedule_delay = GaugeMetricFamily(
+            "airflow_dag_schedule_delay",
+            "Airflow dag schedule delay in seconds",
+            labels=["dag_id","planned_start_date","start_date","execution_date", "interval_bucket"],
+        )
+        for dag in get_dag_schedule_delays():
+            if dag.schedule_interval is not None:
+                c = croniter(dag.schedule_interval, dag.execution_date)
+                planned_start_date = c.get_next(dt.datetime)
+
+                interval = (
+                    planned_start_date - dag.execution_date
+                ).total_seconds() / 3600.0
+                if interval <= 1:
+                    interval_bucket = "<1h"
+                elif interval > 1 and interval <= 6:
+                    interval_bucket = "1-6h"
+                else:
+                    interval_bucket = ">6h"
+
+                dag_schedule_delay = (
+                    dag.start_date - planned_start_date
+                ).total_seconds()
+                airflow_dag_schedule_delay.add_metric(
+                    [dag.dag_id,planned_start_date,dag.start_date,dag.execution_date,  interval_bucket], dag_schedule_delay
+                )
+        yield airflow_dag_schedule_delay
+
 
 
 REGISTRY.register(MetricsCollector())
