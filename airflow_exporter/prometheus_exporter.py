@@ -277,9 +277,9 @@ class MetricsCollector(object):
         for dag in get_dag_scheduler_delay():
             if dag.schedule_interval is not None:
                 if croniter.is_valid(dag.schedule_interval):
-                    c = croniter(cron_presets.get(dag.schedule_interval), dag.execution_date)
-                else:
                     c = croniter(dag.schedule_interval, dag.execution_date)
+                else:
+                    c = croniter(cron_presets.get(dag.schedule_interval), dag.execution_date)
                 scheduled_start_date = c.get_next(dt.datetime)
 
             dag_scheduling_delay_value = (
