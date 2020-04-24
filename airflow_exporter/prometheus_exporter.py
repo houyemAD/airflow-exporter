@@ -153,13 +153,34 @@ def get_dag_labels(dag_id):
 
 def get_dag_scheduler_delay():
     """Compute DAG scheduling delay."""
+    now = dt.datetime.now().replace(tzinfo=pytz.UTC)
+    week_ago = now - dt.timedelta(weeks=1)
+
     with session_scope(Session) as session:
+        max_id_query = (
+            session.query(func.max(DagRun.id))
+            .filter(DagRun.execution_date.between(week_ago, now))
+            .group_by(DagRun.dag_id)
+            .subquery()
+        )
+
         return (
             session.query(
-                DagRun.dag_id, DagRun.execution_date, DagRun.start_date,
+                DagModel.dag_id,
+                DagModel.schedule_interval,
+                DagModel.last_scheduler_run,
+                DagRun.execution_date,
+                DagRun.start_date,
+                DagRun.id
+
             )
-            .order_by(DagRun.execution_date.desc())
-            .limit(20)
+            .join(DagModel, DagModel.dag_id == DagRun.dag_id)
+            .filter(
+                DagModel.is_active == True,
+                DagModel.is_paused == False,
+                DagModel.schedule_interval.isnot(None),
+                DagRun.id.in_(max_id_query),
+            )
             .all()
         )
 
@@ -239,7 +260,7 @@ class MetricsCollector(object):
         dag_scheduler_delay = GaugeMetricFamily(
             "airflow_dag_scheduler_delay",
             "Airflow DAG scheduling delay",
-            labels=["dag_id","start_date","execution_date"],
+            labels=["dag_id","DagRun.id","start_date","execution_date","schedule_interval","last_scheduler_run"],
         )
 
         for dag in get_dag_scheduler_delay():
@@ -247,7 +268,7 @@ class MetricsCollector(object):
                 dag.start_date - dag.execution_date
             ).total_seconds()
             dag_scheduler_delay.add_metric(
-                [dag.dag_id,dag.start_date.strftime("%d-%b-%Y (%H:%M:%S.%f)"),dag.execution_date.strftime("%d-%b-%Y (%H:%M:%S.%f)")], dag_scheduling_delay_value
+                [dag.dag_id, dag.id, dag.start_date.strftime("%d-%b-%Y (%H:%M:%S.%f)"), dag.execution_date.strftime("%d-%b-%Y (%H:%M:%S.%f)"),dag.schedule_interval,dag.last_scheduler_run], dag_scheduling_delay_value
             )
         yield dag_scheduler_delay
 
