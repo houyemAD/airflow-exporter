@@ -23,7 +23,14 @@ import pytz
 import datetime as dt
 from croniter import croniter
 
+cron_presets = {
+    '@hourly': '0 * * * *',
+    '@daily': '0 0 * * *',
+    '@weekly': '0 0 * * 0',
+    '@monthly': '0 0 1 * *',
+    '@yearly': '0 0 1 1 *',
 
+} 
 
 
 @contextmanager
@@ -269,7 +276,10 @@ class MetricsCollector(object):
         now = dt.datetime.utcnow()
         for dag in get_dag_scheduler_delay():
             if dag.schedule_interval is not None:
-                c = croniter(dag.schedule_interval, dag.execution_date)
+                if croniter.is_valid(dag.schedule_interval):
+                    c = croniter(cron_presets.get(dag.schedule_interval), dag.execution_date)
+                else:
+                    c = croniter(dag.schedule_interval, dag.execution_date)
                 scheduled_start_date = c.get_next(dt.datetime)
 
             dag_scheduling_delay_value = (
