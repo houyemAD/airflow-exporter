@@ -168,10 +168,8 @@ def get_dag_scheduler_delay():
             session.query(
                 DagModel.dag_id,
                 DagModel.schedule_interval,
-                DagModel.last_scheduler_run,
                 DagRun.execution_date,
-                DagRun.start_date,
-                DagRun.id
+                DagRun.start_date
 
             )
             .join(DagModel, DagModel.dag_id == DagRun.dag_id)
@@ -260,16 +258,35 @@ class MetricsCollector(object):
         dag_scheduler_delay = GaugeMetricFamily(
             "airflow_dag_scheduler_delay",
             "Airflow DAG scheduling delay",
-            labels=["dag_id","DagRun.id","start_date","execution_date","schedule_interval","last_scheduler_run"],
+            labels=["dag_id","schedule_interval","start_date","scheduled_start_date", "execution_date"],
+        )
+        dag_execution_delay = GaugeMetricFamily(
+            "airflow_dag_exection_delay",
+            "Airflow DAG execution delay",
+            labels=["dag_id","now","start_date"],
         )
 
+        now = dt.datetime.utcnow()
         for dag in get_dag_scheduler_delay():
+            if dag.schedule_interval is not None:
+                c = croniter(dag.schedule_interval, dag.execution_date)
+                scheduled_start_date = c.get_next(dt.datetime)
+
             dag_scheduling_delay_value = (
-                dag.start_date - dag.execution_date
+                dag.start_date - scheduled_start_date
             ).total_seconds()
             dag_scheduler_delay.add_metric(
-                [dag.dag_id, dag.id, dag.start_date.strftime("%d-%b-%Y (%H:%M:%S.%f)"), dag.execution_date.strftime("%d-%b-%Y (%H:%M:%S.%f)"),dag.schedule_interval,dag.last_scheduler_run], dag_scheduling_delay_value
+                [dag.dag_id,dag.schedule_interval, dag.start_date.strftime("%d-%b-%Y (%H:%M:%S.%f)"), scheduled_start_date, dag.execution_date.strftime("%d-%b-%Y (%H:%M:%S.%f)") ], dag_scheduling_delay_value
             )
+
+            if dag.start_date < now :
+                dag_execution_delay_value= (now - dag.start_date ).total_seconds()
+            else 
+                dag_execution_delay_value= 0
+            dag_execution_delay.add_metric(
+                [dag.dag_id, now.strftime("%d-%b-%Y (%H:%M:%S)"), dag.start_date.strftime("%d-%b-%Y (%H:%M:%S.%f)")] , dag_execution_delay_value
+            )
+        yield dag_execution_delay  
         yield dag_scheduler_delay
 
 
