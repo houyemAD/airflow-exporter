@@ -289,8 +289,8 @@ class MetricsCollector(object):
                 [dag.dag_id,dag.schedule_interval, dag.start_date.strftime("%d-%b-%Y (%H:%M:%S.%f)"), scheduled_start_date, dag.execution_date.strftime("%d-%b-%Y (%H:%M:%S.%f)") ], dag_scheduling_delay_value
             )
 
-            if dag.start_date < now :
-                dag_execution_delay_value= (now - dag.start_date ).total_seconds()
+            if dag.start_date.replace(tzinfo=utc) < now.replace(tzinfo=utc) :
+                dag_execution_delay_value= (now.replace(tzinfo=utc) - dag.start_date.replace(tzinfo=utc) ).total_seconds()
             else :
                 dag_execution_delay_value= 0
             dag_execution_delay.add_metric(
