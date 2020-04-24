@@ -281,7 +281,7 @@ class MetricsCollector(object):
 
             if dag.start_date < now :
                 dag_execution_delay_value= (now - dag.start_date ).total_seconds()
-            else 
+            else :
                 dag_execution_delay_value= 0
             dag_execution_delay.add_metric(
                 [dag.dag_id, now.strftime("%d-%b-%Y (%H:%M:%S)"), dag.start_date.strftime("%d-%b-%Y (%H:%M:%S.%f)")] , dag_execution_delay_value
