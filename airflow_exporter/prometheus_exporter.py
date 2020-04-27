@@ -84,9 +84,9 @@ def get_task_duration_info():
         max_execution_dt_query = (
             session.query(
                 DagRun.dag_id,
-                func.max(DagRun.execution_date).label("max_execution_dt"),
+                func.max(DagRun.execution_date).label("max_execution_dt")
             )
-            .join(DagModel, DagModel.dag_id == DagRun.dag_id,)
+            .join(DagModel, DagModel.dag_id == DagRun.dag_id)
             .filter(
                 DagModel.is_active == True,  
                 DagModel.is_paused == False,
@@ -103,7 +103,7 @@ def get_task_duration_info():
                 TaskInstance.task_id,
                 TaskInstance.start_date,
                 TaskInstance.end_date,
-                TaskInstance.execution_date,
+                TaskInstance.execution_date
             )
             .join(
                 max_execution_dt_query,
@@ -113,12 +113,12 @@ def get_task_duration_info():
                         TaskInstance.execution_date
                         == max_execution_dt_query.c.max_execution_dt
                     ),
-                ),
+                )
             )
             .filter(
                 TaskInstance.state == State.SUCCESS,
                 TaskInstance.start_date.isnot(None),
-                TaskInstance.end_date.isnot(None),
+                TaskInstance.end_date.isnot(None)
             )
             .all()
         )
@@ -169,7 +169,7 @@ def get_dag_scheduler_delay():
                 DagModel.is_active == True,
                 DagModel.is_paused == False,
                 DagModel.schedule_interval.isnot(None),
-                DagRun.id.in_(max_id_query),
+                DagRun.id.in_(max_id_query)
             )
             .all()
         )
@@ -201,7 +201,7 @@ class MetricsCollector(object):
         task_duration = GaugeMetricFamily(
             "airflow_task_duration",
             "Duration of successful tasks in seconds",
-            labels=["task_id", "dag_id", "execution_date"],
+            labels=["task_id", "dag_id", "execution_date"]
         )
         for task in get_task_duration_info():
             task_duration_value = (
@@ -209,7 +209,7 @@ class MetricsCollector(object):
             ).total_seconds()
             task_duration.add_metric(
                 [task.task_id, task.dag_id, str(task.execution_date.date())],
-                task_duration_value,
+                task_duration_value
             )
         yield task_duration
 
@@ -251,7 +251,7 @@ class MetricsCollector(object):
         dag_execution_delay = GaugeMetricFamily(
             "airflow_dag_execution_delay",
             "Airflow DAG execution delay",
-            labels=["dag_id","now" ,"start_date","next_start_date","state"],
+            labels=["dag_id","now" ,"start_date","schedule_interval","next_start_date","state"],
         )
 
         now = dt.datetime.utcnow()
@@ -270,7 +270,7 @@ class MetricsCollector(object):
                 dag.start_date - scheduled_start_date
             ).total_seconds()
             dag_scheduler_delay.add_metric(
-                [dag.dag_id, str(dag.execution_date.date),dag.schedule_interval, str(dag.start_date.date), str(scheduled_start_date) ], dag_scheduling_delay_value
+                [dag.dag_id, str(dag.execution_date),dag.schedule_interval, str(dag.start_date), str(scheduled_start_date) ], dag_scheduling_delay_value
             )
 
             if next_start_date.replace(tzinfo=pytz.UTC) < now.replace(tzinfo=pytz.UTC) :
@@ -278,7 +278,7 @@ class MetricsCollector(object):
             else :
                 dag_execution_delay_value= 0
             dag_execution_delay.add_metric(
-                [dag.dag_id, str(now),str(dag.start_date) ,str(next_start_date), dag.state  ] , dag_execution_delay_value
+                [dag.dag_id, str(now),str(dag.start_date),dag.schedule_interval ,str(next_start_date), dag.state  ] , dag_execution_delay_value
             )
 
         yield dag_execution_delay  
