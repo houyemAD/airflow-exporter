@@ -256,17 +256,15 @@ class MetricsCollector(object):
 
         now = dt.datetime.utcnow()
         for dag in get_dag_scheduler_delay():
-            if dag.schedule_interval is not None:
-                if croniter.is_valid(dag.schedule_interval):
-                    {c_start = croniter(dag.schedule_interval, dag.execution_date)
-                    c_next_start= croniter(dag.schedule_interval, dag.start_date)
-                    }
-                else:
-                    {c_start = croniter(cron_presets.get(dag.schedule_interval), dag.execution_date)
-                    c_next_start= croniter(cron_presets.get(dag.schedule_interval), dag.start_date)
-                    }
-                scheduled_start_date = c_start.get_next(dt.datetime)
-                next_start_date = c_next_start.get_next(dt.datetime)
+            if croniter.is_valid(dag.schedule_interval):
+                c_start = croniter(dag.schedule_interval, dag.execution_date)
+                c_next_start= croniter(dag.schedule_interval, dag.start_date)
+            else:
+                c_start = croniter(cron_presets.get(dag.schedule_interval), dag.execution_date)
+                c_next_start= croniter(cron_presets.get(dag.schedule_interval), dag.start_date)
+                    
+            scheduled_start_date = c_start.get_next(dt.datetime)
+            next_start_date = c_next_start.get_next(dt.datetime)
 
             dag_scheduling_delay_value = (
                 dag.start_date - scheduled_start_date
