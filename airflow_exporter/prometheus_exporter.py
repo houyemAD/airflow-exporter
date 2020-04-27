@@ -1,6 +1,4 @@
-from sqlalchemy import func
-from sqlalchemy import text
-from sqlalchemy import and_
+from sqlalchemy import func, text, and_
 
 from flask import Response
 from flask_admin import BaseView, expose
@@ -11,7 +9,6 @@ from airflow.settings import Session
 from airflow.models import TaskInstance, DagModel, DagRun, DagBag
 from airflow.utils.state import State
 
-# Importing base classes that we need to derive
 from prometheus_client import generate_latest, REGISTRY
 from prometheus_client.core import GaugeMetricFamily
 
@@ -35,16 +32,12 @@ cron_presets = {
 
 @contextmanager
 def session_scope(session):
-    """Provide a transactional scope around a series of operations."""
     try:
         yield session
     finally:
         session.close()
 
 def get_dag_state_info():
-    '''get dag info
-    :return dag_info
-    '''
     dag_status_query = Session.query(
         DagRun.dag_id, DagRun.state, func.count(DagRun.state).label('count')
     ).group_by(DagRun.dag_id, DagRun.state).subquery()
@@ -56,9 +49,6 @@ def get_dag_state_info():
 
 
 def get_task_state_info():
-    '''get task info
-    :return task_info
-    '''
     task_status_query = Session.query(
         TaskInstance.dag_id, TaskInstance.task_id,
         TaskInstance.state, func.count(TaskInstance.dag_id).label('value')
@@ -71,10 +61,7 @@ def get_task_state_info():
 
 
 def get_dag_duration_info():
-    '''get duration of currently running DagRuns
-    :return dag_info
-    '''
-    driver = Session.bind.driver # pylint: disable=no-member
+    driver = Session.bind.driver 
     durations = {
         'pysqlite': func.julianday(func.current_timestamp() - func.julianday(DagRun.start_date)) * 86400.0,
         'mysqldb':  func.timestampdiff(text('second'), DagRun.start_date, func.now()),
@@ -93,7 +80,6 @@ def get_dag_duration_info():
     ).all()
 
 def get_task_duration_info():
-    """Duration of successful tasks in seconds."""
     with session_scope(Session) as session:
         max_execution_dt_query = (
             session.query(
@@ -102,7 +88,7 @@ def get_task_duration_info():
             )
             .join(DagModel, DagModel.dag_id == DagRun.dag_id,)
             .filter(
-                DagModel.is_active == True,  # noqa
+                DagModel.is_active == True,  
                 DagModel.is_paused == False,
                 DagRun.state == State.SUCCESS,
                 DagRun.end_date.isnot(None),
@@ -139,7 +125,6 @@ def get_task_duration_info():
 
 
 def get_dag_labels(dag_id):
-    # reuse airflow webserver dagbag
     if settings.RBAC:
         from airflow.www_rbac.views import dagbag
     else:
@@ -157,9 +142,8 @@ def get_dag_labels(dag_id):
     
     return list(labels.keys()), list(labels.values())
 
-
+'''
 def get_dag_scheduler_delay():
-    """Compute DAG scheduling delay."""
     now = dt.datetime.now().replace(tzinfo=pytz.UTC)
     week_ago = now - dt.timedelta(weeks=1)
 
@@ -188,21 +172,17 @@ def get_dag_scheduler_delay():
             )
             .all()
         )
-
+'''
 
 
 class MetricsCollector(object):
-    '''collection of metrics for prometheus'''
-
+    
     def describe(self):
         return []
 
     def collect(self):
-        '''collect metrics'''
-
-        # Task metrics
-        # Each *MetricFamily generates two lines of comments in /metrics, try to minimize noise 
-        # by creating new group for each dag
+        
+        #Task metrics
         task_info = get_task_state_info()
         for dag_id, tasks in itertools.groupby(task_info, lambda x: x.dag_id):
             k, v = get_dag_labels(dag_id)
@@ -245,8 +225,7 @@ class MetricsCollector(object):
             d_state.add_metric([dag.dag_id, dag.owners, dag.state] + v, dag.count)
             yield d_state
 
-        # DagRun metrics
-        driver = Session.bind.driver # pylint: disable=no-member
+        driver = Session.bind.driver 
         for dag in get_dag_duration_info():
             k, v = get_dag_labels(dag.dag_id)
 
@@ -261,6 +240,7 @@ class MetricsCollector(object):
                 dag_duration.add_metric([dag.dag_id] + v, dag.duration.seconds)
             yield dag_duration
 
+'''
         # Scheduler Metrics
         dag_scheduler_delay = GaugeMetricFamily(
             "airflow_dag_scheduler_delay",
@@ -299,7 +279,7 @@ class MetricsCollector(object):
         yield dag_execution_delay  
         #yield dag_scheduler_delay
 
-
+'''
 REGISTRY.register(MetricsCollector())
 
 if settings.RBAC:
@@ -311,7 +291,6 @@ if settings.RBAC:
             return Response(generate_latest(), mimetype='text')
 
 
-    # Metrics View for Flask app builder used in airflow with rbac enabled
     RBACmetricsView = {
         "view": RBACMetrics(),
         "name": "metrics",
