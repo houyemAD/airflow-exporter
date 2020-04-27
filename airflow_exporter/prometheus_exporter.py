@@ -246,39 +246,45 @@ class MetricsCollector(object):
         dag_scheduler_delay = GaugeMetricFamily(
             "airflow_dag_scheduler_delay",
             "Airflow DAG scheduling delay",
-            labels=["dag_id","schedule_interval","start_date","scheduled_start_date", "execution_date"],
+            labels=["dag_id", "execution_date","schedule_interval","start_date","scheduled_start_date"],
         )
         dag_execution_delay = GaugeMetricFamily(
-            "airflow_dag_exection_delay",
+            "airflow_dag_execution_delay",
             "Airflow DAG execution delay",
-            labels=["dag_id","now" ,"start_date","scheduled_start_date","state"],
+            labels=["dag_id","now" ,"start_date","next_start_date","state"],
         )
 
         now = dt.datetime.utcnow()
         for dag in get_dag_scheduler_delay():
             if dag.schedule_interval is not None:
                 if croniter.is_valid(dag.schedule_interval):
-                    c = croniter(dag.schedule_interval, dag.execution_date)
+                    {c_start = croniter(dag.schedule_interval, dag.execution_date)
+                    c_next_start= croniter(dag.schedule_interval, dag.start_date)
+                    }
                 else:
-                    c = croniter(cron_presets.get(dag.schedule_interval), dag.execution_date)
-                scheduled_start_date = c.get_next(dt.datetime)
+                    {c_start = croniter(cron_presets.get(dag.schedule_interval), dag.execution_date)
+                    c_next_start= croniter(cron_presets.get(dag.schedule_interval), dag.start_date)
+                    }
+                scheduled_start_date = c_start.get_next(dt.datetime)
+                next_start_date = c_next_start.get_next(dt.datetime)
 
-            '''dag_scheduling_delay_value = (
+            dag_scheduling_delay_value = (
                 dag.start_date - scheduled_start_date
             ).total_seconds()
             dag_scheduler_delay.add_metric(
-                [dag.dag_id,dag.schedule_interval, str(dag.start_date.date), scheduled_start_date, str(dag.execution_date.date) ], dag_scheduling_delay_value
-            )'''
+                [dag.dag_id, str(dag.execution_date.date),dag.schedule_interval, str(dag.start_date.date), str(scheduled_start_date) ], dag_scheduling_delay_value
+            )
 
-            if scheduled_start_date.replace(tzinfo=pytz.UTC) < now.replace(tzinfo=pytz.UTC) :
-                dag_execution_delay_value= (now.replace(tzinfo=pytz.UTC) - scheduled_start_date.replace(tzinfo=pytz.UTC) ).total_seconds()
+            if next_start_date.replace(tzinfo=pytz.UTC) < now.replace(tzinfo=pytz.UTC) :
+                dag_execution_delay_value= (now.replace(tzinfo=pytz.UTC) - next_start_date.replace(tzinfo=pytz.UTC) ).total_seconds()
             else :
                 dag_execution_delay_value= 0
             dag_execution_delay.add_metric(
-                [dag.dag_id, str(now),str(dag.start_date) ,str(scheduled_start_date), dag.state  ] , dag_execution_delay_value
+                [dag.dag_id, str(now),str(dag.start_date) ,str(next_start_date), dag.state  ] , dag_execution_delay_value
             )
+
         yield dag_execution_delay  
-        #yield dag_scheduler_delay
+        yield dag_scheduler_delay
 
 
 REGISTRY.register(MetricsCollector())
