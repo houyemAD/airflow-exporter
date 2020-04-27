@@ -263,19 +263,19 @@ class MetricsCollector(object):
                     c = croniter(cron_presets.get(dag.schedule_interval), dag.execution_date)
                 scheduled_start_date = c.get_next(dt.datetime)
 
-            dag_scheduling_delay_value = (
+            '''dag_scheduling_delay_value = (
                 dag.start_date - scheduled_start_date
             ).total_seconds()
-            #dag_scheduler_delay.add_metric(
-            #    [dag.dag_id,dag.schedule_interval, str(dag.start_date.date()), scheduled_start_date, str(dag.execution_date.date()) ], dag_scheduling_delay_value
-            #)
+            dag_scheduler_delay.add_metric(
+                [dag.dag_id,dag.schedule_interval, str(dag.start_date.date), scheduled_start_date, str(dag.execution_date.date) ], dag_scheduling_delay_value
+            )'''
 
             if scheduled_start_date.replace(tzinfo=pytz.UTC) < now.replace(tzinfo=pytz.UTC) :
                 dag_execution_delay_value= (now.replace(tzinfo=pytz.UTC) - scheduled_start_date.replace(tzinfo=pytz.UTC) ).total_seconds()
             else :
                 dag_execution_delay_value= 0
             dag_execution_delay.add_metric(
-                [dag.dag_id, str(now),str(dag.start_date) ,str(scheduled_start_date),DagRun.state  ] , dag_execution_delay_value
+                [dag.dag_id, str(now),str(dag.start_date) ,str(scheduled_start_date), dag.state  ] , dag_execution_delay_value
             )
         yield dag_execution_delay  
         #yield dag_scheduler_delay
