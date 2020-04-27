@@ -142,7 +142,7 @@ def get_dag_labels(dag_id):
     
     return list(labels.keys()), list(labels.values())
 
-'''
+
 def get_dag_scheduler_delay():
     now = dt.datetime.now().replace(tzinfo=pytz.UTC)
     week_ago = now - dt.timedelta(weeks=1)
@@ -160,7 +160,8 @@ def get_dag_scheduler_delay():
                 DagModel.dag_id,
                 DagModel.schedule_interval,
                 DagRun.execution_date,
-                DagRun.start_date
+                DagRun.start_date,
+                DagRun.state 
 
             )
             .join(DagModel, DagModel.dag_id == DagRun.dag_id)
@@ -172,7 +173,7 @@ def get_dag_scheduler_delay():
             )
             .all()
         )
-'''
+
 
 
 class MetricsCollector(object):
@@ -240,7 +241,7 @@ class MetricsCollector(object):
                 dag_duration.add_metric([dag.dag_id] + v, dag.duration.seconds)
             yield dag_duration
 
-'''
+
         # Scheduler Metrics
         dag_scheduler_delay = GaugeMetricFamily(
             "airflow_dag_scheduler_delay",
@@ -250,7 +251,7 @@ class MetricsCollector(object):
         dag_execution_delay = GaugeMetricFamily(
             "airflow_dag_exection_delay",
             "Airflow DAG execution delay",
-            labels=["dag_id","now" ,"start_date"],
+            labels=["dag_id","now" ,"start_date","scheduled_start_date","state"],
         )
 
         now = dt.datetime.utcnow()
@@ -269,17 +270,17 @@ class MetricsCollector(object):
             #    [dag.dag_id,dag.schedule_interval, str(dag.start_date.date()), scheduled_start_date, str(dag.execution_date.date()) ], dag_scheduling_delay_value
             #)
 
-            if dag.start_date.replace(tzinfo=pytz.UTC) < now.replace(tzinfo=pytz.UTC) :
-                dag_execution_delay_value= (now.replace(tzinfo=pytz.UTC) - dag.start_date.replace(tzinfo=pytz.UTC) ).total_seconds()
+            if scheduled_start_date.replace(tzinfo=pytz.UTC) < now.replace(tzinfo=pytz.UTC) :
+                dag_execution_delay_value= (now.replace(tzinfo=pytz.UTC) - scheduled_start_date.replace(tzinfo=pytz.UTC) ).total_seconds()
             else :
                 dag_execution_delay_value= 0
             dag_execution_delay.add_metric(
-                [dag.dag_id, str(dt.datetime.utcnow().date()),str(dag.start_date.date())] , dag_execution_delay_value
+                [dag.dag_id, str(now),str(dag.start_date) ,str(scheduled_start_date),DagRun.state  ] , dag_execution_delay_value
             )
         yield dag_execution_delay  
         #yield dag_scheduler_delay
 
-'''
+
 REGISTRY.register(MetricsCollector())
 
 if settings.RBAC:
