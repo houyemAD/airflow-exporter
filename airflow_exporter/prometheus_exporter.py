@@ -246,12 +246,12 @@ class MetricsCollector(object):
         dag_scheduler_delay = GaugeMetricFamily(
             "airflow_dag_scheduler_delay",
             "Airflow DAG scheduling delay",
-            labels=["dag_id", "execution_date","schedule_interval","start_date","scheduled_start_date"],
+            labels=["dag_id"],
         )
         dag_execution_delay = GaugeMetricFamily(
             "airflow_dag_execution_delay",
             "Airflow DAG execution delay",
-            labels=["dag_id","now" ,"start_date","schedule_interval","next_start_date","state"],
+            labels=["dag_id"],
         )
 
         now = dt.datetime.utcnow()
@@ -270,7 +270,7 @@ class MetricsCollector(object):
                 dag.start_date - scheduled_start_date
             ).total_seconds()
             dag_scheduler_delay.add_metric(
-                [dag.dag_id, str(dag.execution_date),dag.schedule_interval, str(dag.start_date), str(scheduled_start_date) ], dag_scheduling_delay_value
+                [dag.dag_id ], dag_scheduling_delay_value
             )
 
             if next_start_date.replace(tzinfo=pytz.UTC) < now.replace(tzinfo=pytz.UTC) :
@@ -278,7 +278,7 @@ class MetricsCollector(object):
             else :
                 dag_execution_delay_value= 0
             dag_execution_delay.add_metric(
-                [dag.dag_id, str(now),str(dag.start_date),dag.schedule_interval ,str(next_start_date), dag.state  ] , dag_execution_delay_value
+                [dag.dag_id  ] , dag_execution_delay_value
             )
 
         yield dag_execution_delay  
