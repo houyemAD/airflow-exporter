@@ -246,12 +246,12 @@ class MetricsCollector(object):
         dag_scheduler_delay = GaugeMetricFamily(
             "airflow_dag_scheduler_delay",
             "Airflow DAG scheduling delay",
-            labels=["dag_id"],
+            labels=["dag_id"]
         )
         dag_execution_delay = GaugeMetricFamily(
             "airflow_dag_execution_delay",
             "Airflow DAG execution delay",
-            labels=["dag_id"],
+            labels=["dag_id"]
         )
 
         now = dt.datetime.utcnow()
